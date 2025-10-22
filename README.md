@@ -2,6 +2,7 @@
 # ITIF publications parser 🚀
 
 A Python script that parses publication data from [itif.org](https://itif.org/publications) 
+
 The script collects titles, publication dates, authors, full text, and PDF download links, saving everything into a structured CSV file.
 
 ---
