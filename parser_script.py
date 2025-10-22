@@ -1,3 +1,9 @@
+"""
+ITIF Publications Parser
+-------------------------
+Saves parsed data (title, date, authors, text, pdf_link, url) to a CSV file
+"""
+
 import re
 import json
 import time
@@ -12,6 +18,7 @@ from lxml import html as lxml_html
 import csv
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from tqdm import tqdm 
 
 # === CONFIG ===
 MAX_PAGES = 10
@@ -165,6 +172,21 @@ def main():
 
             article_urls = [urljoin(url, link) for link in links]
 
+            # Show progress bar for each page
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = [executor.submit(parse_article_with_requests, aurl) for aurl in article_urls]
+                for fut in tqdm(as_completed(futures), total=len(futures), desc=f"Page {page_num}", ncols=80):
+                    article = fut.result()
+                    if article:
+                        all_articles.append(article)
+
+            # Stop after MAX_PAGES
+            if MAX_PAGES > 0 and page_num >= MAX_PAGES:
+                break
+            page_num += 1
+            time.sleep(DELAY_BETWEEN_PAGES)
+    finally:
+        driver.quit()
 
     # Save results
     if all_articles:
