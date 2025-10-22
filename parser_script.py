@@ -75,6 +75,24 @@ def parse_article_list(page_html):
     links = tree.xpath("//a[h2[contains(@class,'font-gothicprobold')]]/@href")
     return links
 
+# === STRICT PDF DETECTION ===
+def extract_pdf_from_downloads(tree, base_url):
+    """Find PDF links only inside the 'Downloads' button area"""
+    UC, lc = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"
+    pdf_xpath = (
+        "//a[contains(translate(@href,'{UC}','{lc}'),'.pdf')]["
+        "  ancestor::*[self::div or self::section or self::aside or self::nav]"
+        "  [ .//*[self::a or self::button or self::span or self::div]"
+        "     [translate(normalize-space(string(.)),'{UC}','{lc}')='downloads']"
+        "  ]"
+        "]"
+        "/@href"
+    ).format(UC=UC, lc=lc)
+    hrefs = tree.xpath(pdf_xpath)
+    if hrefs:
+        return urljoin(base_url, hrefs[0].strip())
+    return ""
+
 # === ARTICLE PARSER ===
 def parse_article_with_requests(url, max_retries=3):
     """Download and parse a single article page"""
@@ -118,6 +136,16 @@ def parse_article_with_requests(url, max_retries=3):
             )
             article["article_body"] = " ".join([clean_text(t) for t in text_nodes if clean_text(t)])
 
+            # PDF 
+            article["pdf_link"] = extract_pdf_from_downloads(tree, url)
+            return article
+
+        except Exception:
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return None
+    return None
 
 # === MAIN FUNCTION ===
 def main():
@@ -143,7 +171,7 @@ def main():
         with open(OUTPUT_FILE, "w", encoding="utf-8-sig", newline="") as f:
             writer = csv.DictWriter(
                 f,
-                fieldnames=["title", "pubdate", "authors", "article_body", "url"],
+                fieldnames=["title", "pubdate", "authors", "article_body", "pdf_link", "url"],
             )
             writer.writeheader()
             writer.writerows(all_articles)
